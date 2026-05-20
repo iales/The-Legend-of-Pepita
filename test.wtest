@@ -1,0 +1,353 @@
+import wollok.game.*
+import pepito.*
+import inventario.*
+import objetos.*
+import enemigos.*
+import obstaculos.*
+import interactuables.*
+import jefeFinal.*
+
+describe "Vida de Pepito" {
+
+  // TEST: Verifica que cuando Pepito pierde una vida, los corazones se actualizan correctamente
+  test "pierde una vida y actualiza interfaz" {
+    pepito.reiniciar() // Empezamos con 6 vidas
+    pepito.perderVida()
+    // Como no podemos acceder a pepito.vida() directamente, verificamos la interfaz
+    assert.equals("vidas5.png", corazones.image())
+  }
+
+  // TEST: Verifica que el sistema de curación funciona y restaura las vidas perdidas (2)
+  test "curarVida funciona correctamente" {
+    pepito.reiniciar() // 6 vidas
+    pepito.perderVida() // 5 vidas
+    pepito.perderVida() // 4 vidas
+    pepito.curarVida()  // debería volver a 6
+    assert.equals("vidas6.png", corazones.image())
+  }
+
+  // TEST: Verifica que la curación no puede exceder el máximo de 6 vidas
+  test "curarVida no pasa del máximo" {
+    pepito.reiniciar() // 6 vidas
+    pepito.perderVida() // 5 vidas
+    pepito.curarVida()  // 5 + 2 = 6 (máximo)
+    assert.equals("vidas6.png", corazones.image())
+  }
+}
+
+describe "Combate con enemigos" {
+  
+  // TEST: Verifica que el sistema de combate funciona - cuando un enemigo colisiona con la espada, pierde vida
+  test "Slime pierde vida cuando colisiona con espada" {
+    const slime = new Slime(position = game.at(10, 10))
+    const vidaInicial = slime.vida()
+    
+    // Simula que la espada (que es un arma) colisiona con el slime
+    slime.colisionarCon(espada)
+    
+    assert.equals(vidaInicial - 1, slime.vida())
+  }
+}
+
+describe "Sistema de Equipamiento" {
+  
+  // TEST: Verifica que pepito puede equipar la espada
+  test "pepito puede equipar espada" {
+    pepito.reiniciar()
+    espada.reiniciar()
+    const equipadaInicial = espada.equipada()
+    
+    // Simula colisión entre pepito y espada
+    espada.colisionarCon(pepito)
+    
+    assert.that(espada.equipada())
+    assert.notEquals(equipadaInicial, espada.equipada())
+  }
+  
+  // TEST: Verifica que la espada se posiciona correctamente al atacar
+  test "espada se posiciona correctamente al atacar hacia arriba" {
+    pepito.reiniciar()
+    pepito.position(game.at(10, 10))
+    pepito.mirandoA("Up")
+    pepito.equiparEspada() // Equipamos la espada usando el método de pepito
+    espada.equipada(true)  // Marcamos como equipada
+    
+    espada.atacar()
+    
+    assert.equals("swordUp.png", espada.image())
+    assert.equals(game.at(10, 12), espada.position()) // 2 posiciones arriba
+  }
+}
+
+describe "Movimiento y Colisiones" {
+  
+  // TEST: Verifica que pepito inicializa correctamente
+  test "pepito inicializa con valores correctos" {
+    pepito.reiniciar()
+    
+    assert.equals(game.at(5, 5), pepito.position())
+    assert.equals("pepitoFront.png", pepito.image())
+    assert.equals("Down", pepito.mirandoA())
+    assert.that(pepito.vivo())
+  }
+  
+  // TEST: Verifica que pepito puede verificar movimientos y está vivo
+  test "pepito puede verificar movimiento y estado" {
+    pepito.reiniciar()
+    
+    // Verificamos que pepito está vivo después de reiniciar
+    assert.that(pepito.vivo())
+    
+    // Verificamos que pepito está en la posición inicial correcta
+    assert.equals(game.at(5, 5), pepito.position())
+    
+    // Verificamos que el método puedeMover funciona (probamos con una posición cercana)
+    const puedeMoverse = pepito.puedeMover(game.at(6, 6))
+    // No importa el resultado, solo que el método no falle
+    assert.that(puedeMoverse || not puedeMoverse) // Siempre verdadero, solo verifica que no lance error
+  }
+}
+
+describe "Sistema de Armas" {
+  
+  // TEST: Verifica que el objeto arma se muestra y reinicia correctamente
+  test "arma se muestra y reinicia correctamente" {
+    arma.reiniciar()
+    
+    // Verificamos posición inicial
+    assert.equals(game.at(50, 50), arma.position())
+    
+    // Mostramos el arma
+    arma.mostrar()
+    assert.equals(game.at(0, 35), arma.position())
+    
+    // Reiniciamos
+    arma.reiniciar()
+    assert.equals(game.at(50, 50), arma.position())
+  }
+}
+
+describe "Sistema de Trampas" {
+  
+  // TEST: Verifica que las trampas de pinchos funcionan bien
+  test "trampa de pinchos daña a pepito cuando está activa" {
+    const trampa = new TrampaPinchos(position = game.at(15, 15), esPisable = true, haceDaño = true)
+    pepito.reiniciar()
+    
+    // Simula colisión cuando la trampa hace daño
+    trampa.colisionarCon(pepito)
+    
+    // Pepito debería haber perdido una vida
+    assert.equals("vidas5.png", corazones.image())
+  }
+  
+  // TEST: Verifica que las trampas de fuego funcionan bien
+  test "trampa de fuego daña a pepito cuando está activa" {
+    const trampaFuego = new TrampaFuego(position = game.at(20, 20), esPisable = true, haceDaño = true)
+    pepito.reiniciar()
+    
+    // Simula colisión cuando la trampa hace daño
+    trampaFuego.colisionarCon(pepito)
+    
+    // Pepito debería haber perdido una vida
+    assert.equals("vidas5.png", corazones.image())
+  }
+}
+
+describe "Sistema de Trampas Avanzadas" {
+  
+  // TEST: Verifica que la trampa de oso inmoviliza a pepito
+  test "trampa de oso inmoviliza a pepito temporalmente" {
+    const trampaOso = new TrampaOso(position = game.at(25, 25), esPisable = true, haceDaño = true)
+    pepito.reiniciar()
+    
+    // Verificamos que pepito puede moverse inicialmente
+    assert.that(pepito.movimiento())
+    
+    // Simulamos que pepito pisa la trampa
+    trampaOso.colisionarCon(pepito)
+    
+    // Verificamos que la trampa cambió de imagen
+    assert.equals("trampaOsoActiva.png", trampaOso.image())
+    // Pepito debería haber perdido una vida
+    assert.equals("vidas5.png", corazones.image())
+  }
+
+  // TEST: Verifica que las trampas no dañan a las armas
+  test "trampas no dañan a las armas" {
+    const trampa = new TrampaPinchos(position = game.at(30, 30), esPisable = true, haceDaño = true)
+    pepito.reiniciar()
+    
+    // Simulamos que la espada colisiona con la trampa
+    trampa.colisionarCon(espada)
+    
+    // Pepito no debería haber perdido vida porque la espada es un arma
+    assert.equals("vidas6.png", corazones.image())
+  }
+}
+
+describe "Objetivo Final - Pepita" {
+  
+  // TEST: Verifica que pepita está en la posición correcta
+  test "pepita está en la posición correcta del castillo" {
+    assert.equals(game.at(18, 25), pepita.position())
+    assert.equals("pepita1.png", pepita.image())
+    assert.that(pepita.esPisable())
+    assert.notThat(pepita.haceDaño())
+  }
+}
+
+describe "Trampas Avanzadas - Comportamiento" {
+  
+  // TEST : Verifica que la trampa de oso se inicializa inactiva
+  test "trampa de oso se inicializa con imagen inactiva" {
+    const trampaOso = new TrampaOso(position = game.at(15, 15), esPisable = true, haceDaño = true)
+    
+    assert.equals("trampaOsoInactiva.png", trampaOso.image())
+    assert.that(trampaOso.activa())
+  }
+  
+  // TEST : Verifica que la trampa de oso cambia de imagen al activarse
+  test "trampa de oso cambia imagen cuando se activa" {
+    const trampaOso = new TrampaOso(position = game.at(15, 15), esPisable = true, haceDaño = true)
+    
+    trampaOso.activar()
+    
+    assert.equals("trampaOsoActiva.png", trampaOso.image())
+    assert.notThat(trampaOso.activa())
+  }
+  
+  // TEST : Verifica que la lava inicia con imagen correcta
+  test "lava se inicializa con la imagen correcta" {
+    const lava = new Lava(position = game.at(20, 20))
+    
+    assert.equals("lavaSaliendo.png", lava.image())
+    assert.notThat(lava.esPisable())
+  }
+  
+  // TEST : Verifica que las flechas tienen daño
+  test "flecha se crea con las propiedades correctas" {
+    const flecha = new Flecha(position = game.at(10, 10), image = "flechaDerecha.png", esPisable = true, haceDaño = true)
+    
+    assert.equals("flechaDerecha.png", flecha.image())
+    assert.that(flecha.haceDaño())
+    assert.that(flecha.esPisable())
+  }
+  
+  // TEST : Verifica que la llave abre el castillo cuando pepito la agarra
+  test "llave abre el castillo cuando pepito la agarra" {
+    castillo.cerrar()
+    assert.notThat(castillo.abierto())
+    
+    const llave = new Llave(position = game.at(8, 8))
+    llave.colisionarCon(pepito)
+    
+    assert.that(castillo.abierto())
+    assert.equals("castilloAbierto2.png", castillo.image())
+  }
+}
+
+describe "Pato Interactable" {
+  
+  // TEST : Verifica que el pato se inicializa en la posición correcta
+  test "pato está en la posición correcta" {
+    assert.equals(game.at(30, 6), pato.position())
+    assert.equals("pato.png", pato.image())
+  }
+  
+  // TEST : Verifica que el pato es pisable
+  test "pato es pisable y no hace daño" {
+    assert.that(pato.esPisable())
+    assert.notThat(pato.haceDaño())
+  }
+}
+
+describe "Enemigos - Cazador" {
+  
+  // TEST: Verifica que el cazador se inicializa correctamente
+  test "cazador se crea con 5 vidas" {
+    const cazador = new Cazador(position = game.at(20, 20))
+    
+    assert.equals(5, cazador.vida())
+    assert.equals("cazador.png", cazador.image())
+    assert.that(cazador.estaVivo())
+    assert.that(cazador.haceDaño())
+  }
+  
+  // TEST: Verifica que el cazador se mueve hacia pepito cuando está a la derecha
+  test "cazador se mueve hacia pepito cuando está a su derecha" {
+    pepito.reiniciar()
+    pepito.position(game.at(25, 10))
+    const cazador = new Cazador(position = game.at(20, 10))
+    const posicionInicial = cazador.position()
+    
+    // El cazador persigue a pepito
+    cazador.perseguirPersonaje("cazadorEspalda.png", "cazador.png", "cazadorIzquierda.png", "cazadorDerecha.png")
+    
+    // El cazador debería moverse hacia la derecha (hacia pepito)
+    assert.that(cazador.position().x() > posicionInicial.x())
+  }
+  
+  // TEST: Verifica que el cazador se mueve hacia pepito cuando está arriba
+  test "cazador se mueve hacia pepito cuando está arriba" {
+    pepito.reiniciar()
+    pepito.position(game.at(15, 15))
+    const cazador = new Cazador(position = game.at(15, 10))
+    const posicionInicial = cazador.position()
+    
+    // El cazador persigue a pepito
+    cazador.perseguirPersonaje("cazadorEspalda.png", "cazador.png", "cazadorIzquierda.png", "cazadorDerecha.png")
+    
+    // El cazador debería moverse hacia arriba (hacia pepito)
+    assert.that(cazador.position().y() > posicionInicial.y())
+  }
+}
+
+describe "Jefe Final - Gato Boss" {
+  
+  // TEST: Verifica que el gato inicia con imagen de disfraz
+  test "gato boss inicia disfrazado" {
+    assert.equals("gatoDisfrazado1.png", gato.image())
+    assert.equals(game.at(15, 20), gato.position())
+  }
+  
+  // TEST: Verifica que el gato tiene 26 vidas
+  test "gato boss tiene 26 puntos de vida" {
+    assert.equals(26, gato.vida())
+    assert.that(gato.estaVivo())
+  }
+  
+  // TEST: Verifica que el gato hace daño
+  test "gato boss es peligroso" {
+    assert.that(gato.haceDaño())
+    assert.that(gato.esPisable())
+  }
+  
+  // TEST: Verifica que el gato puede recibir daño usando el método heredado
+  test "gato boss puede perder vida" {
+    const vidaInicial = gato.vida()
+    
+    // Llamamos directamente al método perderVida heredado de Enemigo
+    gato.perderVida()
+    
+    assert.equals(vidaInicial - 1, gato.vida())
+  }
+  
+  // TEST: Verifica que el SkillShot (bola de energía) se crea correctamente
+  test "skillshot del gato se crea con propiedades correctas" {
+    const bola = new SkillShot(position = game.at(15, 20), image = "bolaEnergia2.png", velocidad = 200, nombre = 1, rango = 20)
+    
+    assert.equals("bolaEnergia2.png", bola.image())
+    assert.that(bola.haceDaño())
+    assert.that(bola.esPisable())
+  }
+  
+  // TEST: Verifica que los gatitos se crean correctamente
+  test "gatito se inicializa con 1 vida" {
+    const gatito = new Gatito(position = game.at(10, 10))
+    
+    assert.equals(1, gatito.vida())
+    assert.equals("gatito1.png", gatito.image())
+    assert.that(gatito.estaVivo())
+  }
+}

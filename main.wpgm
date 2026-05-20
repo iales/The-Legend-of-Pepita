@@ -1,0 +1,11 @@
+import wollok.game.*
+import config.*
+
+program TheLegendOfPepitaGame {
+	config.iniciarJuego()
+	game.start()
+}
+
+
+
+
